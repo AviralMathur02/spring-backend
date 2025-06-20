@@ -4,14 +4,22 @@ import com.example.echobackend.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional; // Use Optional for methods that might not find a result
+import java.util.List;
+import java.util.Optional;
+import java.util.Set; // Import Set for the new method
 
-@Repository // Marks this interface as a Spring Data JPA repository
+@Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    // Custom query method to find a user by username (used in your Node.js auth controller)
     Optional<User> findByUsername(String username);
 
-    // Optional: If you need to find by email during registration or login
     Optional<User> findByEmail(String email);
+
+    List<User> findByUsernameContainingIgnoreCaseOrNameContainingIgnoreCase(String usernameQuery, String nameQuery);
+
+    // NEW: Method to find users whose IDs are NOT in a given set (for suggestions)
+    // This will fetch users that the current user is not following and is not themselves.
+    List<User> findAllByIdNotIn(Set<Long> userIdsToExclude);
+    // You can also add pagination if you expect many users for suggestions:
+    // Page<User> findAllByIdNotIn(Set<Long> userIdsToExclude, Pageable pageable);
 }

@@ -1,12 +1,14 @@
 package com.example.echobackend.controller;
 
 import com.example.echobackend.dto.AddPostRequest;
-import com.example.echobackend.dto.PostResponse; // Import new DTO
+import com.example.echobackend.dto.PostResponse;
 import com.example.echobackend.service.PostService;
+import com.example.echobackend.service.S3Service; // Import S3Service
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile; // Import MultipartFile
 
 import java.util.List;
 
@@ -16,11 +18,25 @@ import java.util.List;
 public class PostController {
 
     private final PostService postService;
+    private final S3Service s3Service; // Inject S3Service
+
+    // New endpoint for general file upload to S3
+    @PostMapping("/upload") // Frontend will hit /api/posts/upload
+    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+        try {
+            String fileUrl = s3Service.uploadFile(file);
+            return ResponseEntity.ok(fileUrl); // Return the S3 URL
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to upload file: " + e.getMessage());
+        }
+    }
 
     @GetMapping
     public ResponseEntity<?> getPosts(@RequestParam(required = false) Long userId) {
         try {
-            List<PostResponse> posts = postService.getPosts(userId); // Use PostResponse DTO
+            List<PostResponse> posts = postService.getPosts(userId);
             return ResponseEntity.ok(posts);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
@@ -32,6 +48,7 @@ public class PostController {
     @PostMapping
     public ResponseEntity<String> addPost(@RequestBody AddPostRequest request) {
         try {
+            // The `request.getImg()` should now directly contain the S3 URL from the frontend
             String message = postService.addPost(request);
             return ResponseEntity.status(HttpStatus.CREATED).body(message);
         } catch (RuntimeException e) {

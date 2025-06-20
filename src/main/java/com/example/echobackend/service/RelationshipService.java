@@ -1,6 +1,5 @@
 package com.example.echobackend.service;
 
-import com.example.echobackend.dto.RelationshipRequest;
 import com.example.echobackend.model.Relationship;
 import com.example.echobackend.model.User;
 import com.example.echobackend.repository.RelationshipRepository;
@@ -9,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // For delete operation
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,17 +18,15 @@ import java.util.stream.Collectors;
 public class RelationshipService {
 
     private final RelationshipRepository relationshipRepository;
-    private final UserRepository userRepository; // To get authenticated user ID
+    private final UserRepository userRepository;
 
-    // Equivalent to Node.js getRelationships
-    public List<Long> getFollowersOfUser(Long followedUserId) {
-        List<Relationship> relationships = relationshipRepository.findByFollowerUserId(followedUserId);
+    public List<Long> getFollowerUserIdsForUser(Long followedUserId) {
+        List<Relationship> relationships = relationshipRepository.findByFollowedUserId(followedUserId);
         return relationships.stream()
                 .map(Relationship::getFollowerUserId)
                 .collect(Collectors.toList());
     }
-    
-    // Helper method for PostService to get IDs of users CURRENT_USER follows
+
     public List<Long> getFollowedUserIds(Long followerUserId) {
         return relationshipRepository.findByFollowerUserId(followerUserId)
                 .stream()
@@ -37,27 +34,22 @@ public class RelationshipService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public String addRelationship(Long followerUserId, Long followedUserId) { // <<-- ADDED followerUserId parameter
+        // The followerUserId is now passed directly from the controller
+        // So, we no longer need to fetch it here.
+        // The controller handles getting current user ID.
 
-    // Equivalent to Node.js addRelationship
-    public String addRelationship(RelationshipRequest request) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("Not logged in!");
+        if (followerUserId == null) { // Basic check for null followerId
+            throw new RuntimeException("Follower ID cannot be null.");
         }
-
-        String authenticatedUsername = authentication.getName();
-        User currentUser = userRepository.findByUsername(authenticatedUsername)
-                .orElseThrow(() -> new RuntimeException("Authenticated user not found."));
-        Long followerUserId = currentUser.getId();
-        Long followedUserId = request.getUserId(); // The user to follow
 
         if (followerUserId.equals(followedUserId)) {
             throw new RuntimeException("Cannot follow yourself!");
         }
 
-        // Check if relationship already exists
-        if (relationshipRepository.findByFollowerUserIdAndFollowedUserId(followerUserId, followedUserId).isPresent()) {
-            return "Already following."; // Or throw an error if you prefer
+        if (relationshipRepository.existsByFollowerUserIdAndFollowedUserId(followerUserId, followedUserId)) {
+            return "Already following.";
         }
 
         Relationship newRelationship = new Relationship(followerUserId, followedUserId);
@@ -65,25 +57,68 @@ public class RelationshipService {
         return "Following";
     }
 
-    // Equivalent to Node.js deleteRelationship
-    @Transactional // Required for delete operations that use custom methods
-    public String deleteRelationship(Long userIdToDelete) { // userIdToDelete is the followedUserId
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("Not logged in!");
+    @Transactional
+    public String deleteRelationship(Long followerUserId, Long followedUserId) { // <<-- ADDED followerUserId parameter
+        // The followerUserId is now passed directly from the controller
+        // So, we no longer need to fetch it here.
+
+        if (followerUserId == null) { // Basic check for null followerId
+            throw new RuntimeException("Follower ID cannot be null.");
         }
 
-        String authenticatedUsername = authentication.getName();
-        User currentUser = userRepository.findByUsername(authenticatedUsername)
-                .orElseThrow(() -> new RuntimeException("Authenticated user not found."));
-        Long followerUserId = currentUser.getId(); // The current user unfollowing
-
-        // Check if the relationship exists before deleting
-        if (!relationshipRepository.findByFollowerUserIdAndFollowedUserId(followerUserId, userIdToDelete).isPresent()) {
+        if (!relationshipRepository.existsByFollowerUserIdAndFollowedUserId(followerUserId, followedUserId)) {
             throw new RuntimeException("Not following this user.");
         }
 
-        relationshipRepository.deleteByFollowerUserIdAndFollowedUserId(followerUserId, userIdToDelete);
+        relationshipRepository.deleteByFollowerUserIdAndFollowedUserId(followerUserId, followedUserId);
         return "Unfollow";
+    }
+
+    public boolean isFollowing(Long currentUserId, Long followedUserId) { // <<-- ADDED currentUserId parameter
+        // The currentUserId (authenticated user) is now passed directly from the controller
+        // So, we no longer need to fetch it here.
+
+        if (currentUserId == null) {
+            return false; // Cannot check if not logged in or current user ID is unknown
+        }
+        return relationshipRepository.existsByFollowerUserIdAndFollowedUserId(currentUserId, followedUserId);
+    }
+
+    // --- EXISTING SERVICE METHODS (No changes needed here unless you want to refactor) ---
+
+    /**
+     * Gets the count of followers for a given user.
+     * @param userId The ID of the user whose followers are to be counted.
+     * @return The number of followers.
+     */
+    public long getFollowerCount(Long userId) {
+        return relationshipRepository.countByFollowedUserId(userId);
+    }
+
+    /**
+     * Gets the count of users followed by a given user.
+     * @param userId The ID of the user whose following count is to be determined.
+     * @return The number of users followed.
+     */
+    public long getFollowingCount(Long userId) {
+        return relationshipRepository.countByFollowerUserId(userId);
+    }
+
+    /**
+     * Gets a list of User objects who are following a given user.
+     * @param userId The ID of the user whose followers are to be listed.
+     * @return A list of User objects (followers).
+     */
+    public List<User> getFollowersList(Long userId) {
+        return relationshipRepository.findFollowersOfUser(userId);
+    }
+
+    /**
+     * Gets a list of User objects that a given user is following.
+     * @param userId The ID of the user whose following list is to be retrieved.
+     * @return A list of User objects (users being followed).
+     */
+    public List<User> getFollowingList(Long userId) {
+        return relationshipRepository.findFollowingOfUser(userId);
     }
 }

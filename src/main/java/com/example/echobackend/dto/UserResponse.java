@@ -15,6 +15,8 @@ public class UserResponse {
     private String coverPic;
     private String profilePic;
     private String city;
-    private String website;
+    // --- MODIFIED: Replaced 'website' with 'websiteName' and 'websiteUrl' ---
+    private String websiteName;
+    private String websiteUrl;
     // Password is intentionally excluded
 }

@@ -1,22 +1,38 @@
 package com.example.echobackend.repository;
 
 import com.example.echobackend.model.Relationship;
-// No direct import needed for Relationship.RelationshipId if it's referenced as an inner class
+import com.example.echobackend.model.Relationship.RelationshipId;
+import com.example.echobackend.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface RelationshipRepository extends JpaRepository<Relationship, Relationship.RelationshipId> { // IMPORTANT: Reference the nested class correctly
+public interface RelationshipRepository extends JpaRepository<Relationship, RelationshipId> {
 
-    // Custom method to find all followed user IDs by a followerUserId
     List<Relationship> findByFollowerUserId(Long followerUserId);
 
-    // Custom method to find if a relationship exists
     Optional<Relationship> findByFollowerUserIdAndFollowedUserId(Long followerUserId, Long followedUserId);
 
-    // Custom method to delete a relationship
+    boolean existsByFollowerUserIdAndFollowedUserId(Long followerUserId, Long followedUserId);
+
     void deleteByFollowerUserIdAndFollowedUserId(Long followerUserId, Long followedUserId);
+
+    List<Relationship> findByFollowedUserId(Long followedUserId);
+
+    long countByFollowedUserId(Long followedUserId);
+
+    long countByFollowerUserId(Long followerUserId);
+
+    // THIS IS THE CORRECTED QUERY: SELECTS the User entity 'u' directly
+    @Query("SELECT u FROM User u JOIN Relationship r ON u.id = r.followerUserId WHERE r.followedUserId = :followedUserId")
+    List<User> findFollowersOfUser(@Param("followedUserId") Long followedUserId);
+
+    // THIS IS THE CORRECTED QUERY: SELECTS the User entity 'u' directly
+    @Query("SELECT u FROM User u JOIN Relationship r ON u.id = r.followedUserId WHERE r.followerUserId = :followerUserId")
+    List<User> findFollowingOfUser(@Param("followerUserId") Long followerUserId);
 }

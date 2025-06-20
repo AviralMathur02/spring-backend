@@ -18,7 +18,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager; // Keep this dependency
+    private final AuthenticationManager authenticationManager;
 
     public String register(RegisterRequest request) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
@@ -37,7 +37,11 @@ public class AuthService {
         newUser.setCoverPic("defaultCover.jpg"); // Example default
         newUser.setProfilePic("defaultProfile.jpg"); // Example default
         newUser.setCity("Unknown");
-        newUser.setWebsite("N/A");
+        // newUser.setWebsite("N/A"); // <--- REMOVE THIS LINE (The old line 40)
+
+        // --- NEW: Set default values for websiteName and websiteUrl ---
+        newUser.setWebsiteName("N/A"); // Default website name
+        newUser.setWebsiteUrl(""); // Default empty website URL
 
         userRepository.save(newUser);
         return "User registered successfully!";
